@@ -1,72 +1,32 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 
-void main() => runApp(const MyApp());
+void main() => runApp(MyApp());
 
 class MyApp extends StatelessWidget {
-  const MyApp({Key? key}) : super(key: key);
+  final JenisPinjamanCubit jenisPinjamanCubit = JenisPinjamanCubit();
+
+  MyApp({Key? key}) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      home: const HalamanUtama(),
-      routes: {
-        DetilJenisPinjamanPage.routeName: (context) => DetilJenisPinjamanPage(),
-      },
+    return BlocProvider<JenisPinjamanCubit>.value(
+      value: jenisPinjamanCubit,
+      child: MaterialApp(
+        home: const HalamanUtama(),
+        routes: {
+          DetilJenisPinjamanPage.routeName: (context) =>
+              const DetilJenisPinjamanPage(),
+        },
+      ),
     );
   }
 }
 
-class HalamanUtama extends StatefulWidget {
+class HalamanUtama extends StatelessWidget {
   const HalamanUtama({Key? key}) : super(key: key);
-
-  @override
-  State<HalamanUtama> createState() => _HalamanUtamaState();
-}
-
-class _HalamanUtamaState extends State<HalamanUtama> {
-  // String selectedJenis = '1';
-  String? selectedJenis; // Change the type to String?
-  List<JenisPinjaman> jenisPinjamanList = [];
-
-  Future<List<JenisPinjaman>> fetchData() async {
-    if (selectedJenis == null) {
-      // Menampilkan pesan jika selectedJenis belum dipilih
-      print('Pilih jenis pinjaman terlebih dahulu');
-      return []; // Mengembalikan list kosong
-    }
-
-    String url = "http://178.128.17.76:8000/jenis_pinjaman/$selectedJenis";
-    final response = await http.get(Uri.parse(url));
-
-    if (response.statusCode == 200) {
-      var jsonData = jsonDecode(response.body);
-      jenisPinjamanList = List<JenisPinjaman>.from(jsonData['data'].map(
-        (json) => JenisPinjaman.fromJson(json),
-      ));
-      return jenisPinjamanList;
-    } else {
-      throw Exception('Failed to load jenis pinjaman');
-    }
-  }
-
-  Future<void> fetchDetilJenisPinjaman(String id) async {
-    String url = "http://178.128.17.76:8000/detil_jenis_pinjaman/$id";
-    final response = await http.get(Uri.parse(url));
-
-    if (response.statusCode == 200) {
-      var jsonData = jsonDecode(response.body);
-      var detilJenisPinjaman = DetilJenisPinjaman.fromJson(jsonData);
-      Navigator.pushNamed(
-        context,
-        DetilJenisPinjamanPage.routeName,
-        arguments: detilJenisPinjaman,
-      );
-    } else {
-      throw Exception('Failed to load detil jenis pinjaman');
-    }
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -78,8 +38,7 @@ class _HalamanUtamaState extends State<HalamanUtama> {
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
-          crossAxisAlignment:
-              CrossAxisAlignment.start, // Center align the dropdown
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             const SizedBox(height: 16),
             const Text(
@@ -88,46 +47,38 @@ class _HalamanUtamaState extends State<HalamanUtama> {
             ),
             const SizedBox(height: 16),
             Center(
-              // Wrap the DropdownButton with Center widget
-              child: DropdownButton<String>(
-                value: selectedJenis,
-                hint: const Text('Pilih jenis pinjaman'), // Menampilkan hint
-                items: [
-                  DropdownMenuItem<String>(
-                    value: '1',
-                    child: const Text('Pilihan 1'),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: '2',
-                    child: const Text('Pilihan 2'),
-                  ),
-                  DropdownMenuItem<String>(
-                    value: '3',
-                    child: const Text('Pilihan 3'),
-                  ),
-                ],
-                onChanged: (value) {
-                  setState(() {
-                    selectedJenis = value!;
-                  });
-                  fetchData();
+              child: BlocBuilder<JenisPinjamanCubit, List<JenisPinjaman>>(
+                builder: (context, state) {
+                  return DropdownButton<String>(
+                    value: context.watch<JenisPinjamanCubit>().selectedJenis,
+                    hint: const Text('Pilih jenis pinjaman'),
+                    items: state.map((jenisPinjaman) {
+                      return DropdownMenuItem<String>(
+                        value: jenisPinjaman.id,
+                        child: Text(jenisPinjaman.nama),
+                      );
+                    }).toList(),
+                    onChanged: (value) {
+                      context
+                          .read<JenisPinjamanCubit>()
+                          .selectJenisPinjaman(value!);
+                    },
+                  );
                 },
               ),
             ),
             const SizedBox(height: 16),
-            FutureBuilder<List<JenisPinjaman>>(
-              future: fetchData(),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const LinearProgressIndicator();
-                } else if (snapshot.hasError) {
-                  return Text('Error: ${snapshot.error}');
-                } else if (snapshot.hasData) {
+            BlocBuilder<JenisPinjamanCubit, List<JenisPinjaman>>(
+              builder: (context, state) {
+                if (state.isEmpty) {
+                  return const SizedBox(); // Placeholder widget when there's no data
+                } else {
                   return Expanded(
                     child: ListView.builder(
                       shrinkWrap: true,
-                      itemCount: snapshot.data!.length,
+                      itemCount: state.length,
                       itemBuilder: (context, index) {
+                        final jenisPinjaman = state[index];
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 8.0),
                           child: Card(
@@ -143,13 +94,13 @@ class _HalamanUtamaState extends State<HalamanUtama> {
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
                                     Text(
-                                      snapshot.data![index].nama,
+                                      jenisPinjaman.nama,
                                       style: const TextStyle(
                                         fontSize: 16,
                                       ),
                                     ),
                                     Text(
-                                      'id: ${snapshot.data![index].id}',
+                                      'id: ${jenisPinjaman.id}',
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: Colors.grey,
@@ -178,8 +129,10 @@ class _HalamanUtamaState extends State<HalamanUtama> {
                                   },
                                 ),
                                 onTap: () {
-                                  fetchDetilJenisPinjaman(
-                                      snapshot.data![index].id);
+                                  context
+                                      .read<JenisPinjamanCubit>()
+                                      .fetchDetailJenisPinjaman(
+                                          context, jenisPinjaman.id);
                                 },
                               ),
                             ),
@@ -188,8 +141,6 @@ class _HalamanUtamaState extends State<HalamanUtama> {
                       },
                     ),
                   );
-                } else {
-                  return const SizedBox(); // Placeholder widget when there's no data
                 }
               },
             ),
@@ -214,6 +165,55 @@ class JenisPinjaman {
   }
 }
 
+class JenisPinjamanCubit extends Cubit<List<JenisPinjaman>> {
+  String? selectedJenis;
+
+  JenisPinjamanCubit() : super([]);
+
+  void selectJenisPinjaman(String jenisId) {
+    selectedJenis = jenisId;
+    fetchData();
+  }
+
+  Future<void> fetchData() async {
+    if (selectedJenis == null) {
+      // Menampilkan pesan jika selectedJenis belum dipilih
+      print('Pilih jenis pinjaman terlebih dahulu');
+      emit([]); // Mengupdate state dengan list kosong
+      return;
+    }
+    String url = "http://178.128.17.76:8000/jenis_pinjaman/$selectedJenis";
+    final response = await http.get(Uri.parse(url));
+
+    if (response.statusCode == 200) {
+      var jsonData = jsonDecode(response.body);
+      List<JenisPinjaman> jenisPinjamanList =
+          List<JenisPinjaman>.from(jsonData['data'].map(
+        (json) => JenisPinjaman.fromJson(json),
+      ));
+      emit(jenisPinjamanList); // Mengupdate state dengan data yang di-fetch
+    } else {
+      throw Exception('Failed to load jenis pinjaman');
+    }
+  }
+
+  Future<void> fetchDetailJenisPinjaman(BuildContext context, String id) async {
+    String url = "http://178.128.17.76:8000/detil_jenis_pinjaman/$id";
+    final response = await http.get(Uri.parse(url));
+    if (response.statusCode == 200) {
+      var jsonData = jsonDecode(response.body);
+      var detilJenisPinjaman = DetilJenisPinjaman.fromJson(jsonData);
+      Navigator.pushNamed(
+        context,
+        DetilJenisPinjamanPage.routeName,
+        arguments: detilJenisPinjaman,
+      );
+    } else {
+      throw Exception('Failed to load detil jenis pinjaman');
+    }
+  }
+}
+
 class DetilJenisPinjaman {
   String id;
   String nama;
@@ -232,7 +232,7 @@ class DetilJenisPinjaman {
       id: json['id'],
       nama: json['nama'],
       bunga: json['bunga'],
-      isSyariah: json['is_syariah'] == 'YA', // Convert string to boolean
+      isSyariah: json['is_syariah'],
     );
   }
 }
@@ -240,25 +240,39 @@ class DetilJenisPinjaman {
 class DetilJenisPinjamanPage extends StatelessWidget {
   static const routeName = '/detil_jenis_pinjaman';
 
+  const DetilJenisPinjamanPage({Key? key}) : super(key: key);
+
   @override
   Widget build(BuildContext context) {
     final detilJenisPinjaman =
         ModalRoute.of(context)!.settings.arguments as DetilJenisPinjaman;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Detil'),
-        centerTitle: true,
+        title: const Text('Detil Jenis Pinjaman'),
       ),
-      body: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text('id: ${detilJenisPinjaman.id}'),
-          Text('Nama: ${detilJenisPinjaman.nama}'),
-          Text('Bunga: ${detilJenisPinjaman.bunga}'),
-          Text('Syariah: ${detilJenisPinjaman.isSyariah ? 'YA' : 'TIDAK'}'),
-        ],
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'ID: ${detilJenisPinjaman.id}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              'Nama: ${detilJenisPinjaman.nama}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              'Bunga: ${detilJenisPinjaman.bunga}',
+              style: const TextStyle(fontSize: 16),
+            ),
+            Text(
+              'Syariah: ${detilJenisPinjaman.isSyariah ? 'Ya' : 'Tidak'}',
+              style: const TextStyle(fontSize: 16),
+            ),
+          ],
+        ),
       ),
     );
   }
