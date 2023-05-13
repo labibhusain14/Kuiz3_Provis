@@ -1,5 +1,8 @@
 # Kuiz3_Provis
 
+
+untuk file tes_quiz_1.dart -> belum menggunkaan cubit
+yang tes_quiz.dart menggunkan cubit tetapi belum selesai diubah kodenya.
 ### Tahap 1
 ![image](https://github.com/labibhusain14/Kuiz3_Provis/assets/119772365/70c07262-bfc0-40cd-b4ec-f340144664ef)
 
